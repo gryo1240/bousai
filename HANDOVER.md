@@ -16,12 +16,12 @@
 | 項目 | 内容 |
 |---|---|
 | アプリ名 | 防災リュックチェッカー |
-| 公開URL | https://gryo1240.github.io/bousai/ (※リポジトリ公開後に有効) |
+| 公開URL | https://gryo1240.github.io/bousai/ |
 | 種別 | 家族構成に合わせた防災リュックの中身リスト自動作成・チェックアプリ(PWA・インストール可) |
 | 料金 / 登録 | 完全無料・アカウント登録不要・広告なし(アプリ本体) |
 | 対応端末 | スマホ(Android/iPhone)・PC のモダンブラウザ |
 | データの扱い | チェック状況・家族構成は端末内のみ(localStorage)。外部送信なし・同期機能なし |
-| リポジトリ | https://github.com/gryo1240/bousai (予定) |
+| リポジトリ | https://github.com/gryo1240/bousai (public・公開済み) |
 
 ### アプリの特徴(記事の訴求ポイント)
 
