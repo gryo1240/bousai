@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#67743A">
+<title>防災リュックチェッカー — 家族構成に合わせた中身リストと点検</title>
+<meta name="description" content="家族構成(大人・子ども・乳幼児・高齢者・ペット)を入れると、防災リュックに必要な中身リストを自動作成。持っている物をチェックして、足りない物だけ買い物リストに。無料・登録不要・データは端末内のみ。">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ぼうさい">
+</head>
+<body>
+<style>
+:root{
+  --bg:#F5F6F0; --surface:#FFFFFF; --ink:#2B2F23; --muted:#757D66;
+  --line:#E1E5D5; --accent:#67743A; --accent-ink:#FFFFFF; --accent-soft:#EBEFDD;
+  --warn:#B0563B; --warn-soft:#F6E9E3; --chip:#EDF0E3; --ok:#3E7A52; --okbg:#E5F0E9;
+  --shadow:0 1px 3px rgba(45,55,30,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#171A12; --surface:#21251A; --ink:#E7EAE0; --muted:#9BA28C;
+    --line:#343B29; --accent:#A9B87A; --accent-ink:#1C2410; --accent-soft:#2A3220;
+    --warn:#D69073; --warn-soft:#3A2A21; --chip:#2B3122; --ok:#7FBE97; --okbg:#233A2C;
+    --shadow:0 1px 3px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="light"]{
+  --bg:#F5F6F0; --surface:#FFFFFF; --ink:#2B2F23; --muted:#757D66;
+  --line:#E1E5D5; --accent:#67743A; --accent-ink:#FFFFFF; --accent-soft:#EBEFDD;
+  --warn:#B0563B; --warn-soft:#F6E9E3; --chip:#EDF0E3; --ok:#3E7A52; --okbg:#E5F0E9;
+  --shadow:0 1px 3px rgba(45,55,30,.08);
+}
+:root[data-theme="dark"]{
+  --bg:#171A12; --surface:#21251A; --ink:#E7EAE0; --muted:#9BA28C;
+  --line:#343B29; --accent:#A9B87A; --accent-ink:#1C2410; --accent-soft:#2A3220;
+  --warn:#D69073; --warn-soft:#3A2A21; --chip:#2B3122; --ok:#7FBE97; --okbg:#233A2C;
+  --shadow:0 1px 3px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{background:var(--bg); color:var(--ink);
+  font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,sans-serif;
+  font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;}
+#app{max-width:720px; margin:0 auto; padding:0 14px 84px;}
+header.top{position:sticky; top:0; z-index:20; background:var(--bg);
+  padding:14px 2px 10px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--line);}
+header.top h1{font-size:18px; font-weight:700; letter-spacing:.02em;}
+header.top .sub{color:var(--muted); font-size:13px; font-variant-numeric:tabular-nums; margin-left:auto;}
+main{padding-top:14px;}
+h2{font-size:15px; font-weight:700; letter-spacing:.04em; margin:18px 0 8px;}
+.small{font-size:12.5px; color:var(--muted);}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow); padding:12px 14px; margin-bottom:10px;}
+button{font:inherit; cursor:pointer; border:none; border-radius:8px; padding:8px 14px; background:var(--chip); color:var(--ink);}
+button:focus-visible, textarea:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+button.primary{background:var(--accent); color:var(--accent-ink); font-weight:700;}
+button.ghost{background:transparent; border:1px solid var(--line);}
+textarea{font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:7px 10px; width:100%; min-height:90px;}
+.row{display:flex; flex-wrap:wrap; gap:8px; align-items:center;}
+.grow{flex:1 1 auto; min-width:0;}
+nav.tabs{position:fixed; bottom:0; left:0; right:0; z-index:30; background:var(--surface); border-top:1px solid var(--line); display:flex; justify-content:center;}
+nav.tabs .inner{display:flex; width:100%; max-width:720px;}
+nav.tabs button{flex:1; background:none; border-radius:0; padding:10px 0 12px; font-size:11.5px; color:var(--muted); display:flex; flex-direction:column; gap:2px; align-items:center;}
+nav.tabs button .ic{font-size:18px; line-height:1;}
+nav.tabs button.on{color:var(--accent); font-weight:700;}
+.chip{display:inline-block; font-size:12px; padding:3px 10px; border-radius:999px; background:var(--chip); color:var(--ink);}
+.chip.ok{background:var(--okbg); color:var(--ok); font-weight:700;}
+.chip.ng{background:var(--warn-soft); color:var(--warn); font-weight:700;}
+/* family steppers */
+.fam{display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid var(--line);}
+.fam:last-child{border-bottom:none;}
+.fam .lb{flex:1; min-width:0; font-size:14px;}
+.fam .lb .hint{display:block; font-size:11.5px; color:var(--muted);}
+.fam .num{font-weight:800; font-variant-numeric:tabular-nums; width:2em; text-align:center; font-size:16px;}
+.fam button{width:36px; height:36px; padding:0; font-size:18px; line-height:1; border-radius:50%;}
+.seg{display:flex; flex-wrap:wrap; gap:6px;}
+.seg button{padding:6px 12px; font-size:13px; border:1px solid var(--line); background:var(--surface); border-radius:8px;}
+.seg button.on{background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:700;}
+/* progress */
+.pbar{height:12px; background:var(--chip); border-radius:999px; overflow:hidden;}
+.pbar>div{height:100%; background:var(--accent); border-radius:999px; transition:width .3s;}
+@media (prefers-reduced-motion: reduce){ .pbar>div{transition:none;} }
+.pnum{font-variant-numeric:tabular-nums;}
+.big{font-size:24px; font-weight:800; font-variant-numeric:tabular-nums;}
+/* item rows */
+.item{display:flex; align-items:flex-start; gap:10px; padding:9px 2px; border-bottom:1px solid var(--line);}
+.item:last-child{border-bottom:none;}
+.item input[type=checkbox]{width:22px; height:22px; accent-color:var(--accent); flex-shrink:0; margin-top:3px;}
+.item .nm{flex:1; min-width:0;}
+.item .nm .t{font-weight:600;}
+.item .nm .q{font-size:12.5px; color:var(--accent); font-weight:700;}
+.item .nm .s{font-size:12px; color:var(--muted);}
+.item.done .nm .t{text-decoration:line-through; color:var(--muted);}
+.grouphead{font-size:13px; font-weight:700; letter-spacing:.05em; margin:14px 0 4px; color:var(--muted);}
+.grouphead:first-child{margin-top:0;}
+details{margin-top:8px;}
+details summary{cursor:pointer; font-size:13.5px; padding:4px 0; font-weight:600;}
+.article h4{font-size:14px; margin:12px 0 4px;}
+.article p,.article li{font-size:13.5px;}
+.article ul,.article ol{padding-left:1.4em;}
+.notice{background:var(--accent-soft); border-radius:8px; padding:10px 12px; font-size:13.5px; margin-bottom:10px;}
+</style>
+
+<div id="app">
+  <header class="top"><h1>防災リュックチェッカー</h1><span class="sub" id="hSub"></span></header>
+  <main>
+    <section id="tab-pack"></section>
+    <section id="tab-shop" hidden></section>
+    <section id="tab-know" hidden></section>
+    <section id="tab-settings" hidden></section>
+  </main>
+</div>
+<nav class="tabs"><div class="inner">
+  <button data-tab="pack" class="on"><span class="ic">🎒</span>リュック</button>
+  <button data-tab="shop"><span class="ic">🛒</span>足りない物</button>
+  <button data-tab="know"><span class="ic">💡</span>知識</button>
+  <button data-tab="settings"><span class="ic">⚙️</span>設定</button>
+</div></nav>
+
+<script>
+"use strict";
+/* ============ 持ち出し品リスト ============
+   grp: 全員=null / baby=乳幼児 / kid=子ども / senior=高齢者 / woman=女性 / pet=ペット がいる時だけ表示
+   q(f): 家族構成から目安数量の文字列を返す(価格・商品名は持たない=リライト不要の設計) */
+function ppl(f){ return f.adult+f.kid+f.senior; }   // 飲食・装備の基準人数(乳幼児は別枠)
+const ITEMS=[
+ /* 水・食料 */
+ {id:"w1",cat:"水・食料",name:"飲料水(500mlペットボトル)",grp:null,q:f=>`${ppl(f)*3}本目安`,s:"1人500ml×3本(約1.5L)が持ち出し用の目安。備蓄用の水(1人1日3L×3日)は家に別置き"},
+ {id:"w2",cat:"水・食料",name:"そのまま食べられる非常食",grp:null,q:f=>`${ppl(f)*3}食分`,s:"調理不要の物(アルファ米・パンの缶詰・レトルト)。1人3食分"},
+ {id:"w3",cat:"水・食料",name:"栄養補助食品・ようかん・飴",grp:null,q:()=>"適量",s:"火も水も要らず高カロリー。気持ちも落ち着く"},
+ {id:"w4",cat:"水・食料",name:"紙皿・紙コップ・割り箸",grp:null,q:f=>`${ppl(f)}人分×3日`,s:"洗い水を節約できる"},
+ /* 情報・電源 */
+ {id:"d1",cat:"情報・電源",name:"モバイルバッテリー",grp:null,q:()=>"1〜2個",s:"満充電にして保管。年に2回は充電チェック"},
+ {id:"d2",cat:"情報・電源",name:"携帯ラジオ(電池式)",grp:null,q:()=>"1台",s:"停電時の情報源。手回し充電つきならバッテリー兼用に"},
+ {id:"d3",cat:"情報・電源",name:"懐中電灯・ヘッドライト",grp:null,q:f=>`${ppl(f)}個(1人1灯)`,s:"両手が空くヘッドライトが便利"},
+ {id:"d4",cat:"情報・電源",name:"予備の乾電池",grp:null,q:()=>"使う機器のサイズを各数本",s:"ラジオ・ライトと同じサイズで揃えると管理がラク"},
+ {id:"d5",cat:"情報・電源",name:"スマホの充電ケーブル",grp:null,q:()=>"家族の機種分",s:"車で充電できるシガーソケット用もあると強い"},
+ /* 衛生・トイレ */
+ {id:"h1",cat:"衛生・トイレ",name:"簡易トイレ(携帯トイレ)",grp:null,q:f=>`${ppl(f)*15}回分`,s:"1人1日5回×3日が目安。断水時に最初に困るのはトイレ"},
+ {id:"h2",cat:"衛生・トイレ",name:"トイレットペーパー(芯を抜いて圧縮)",grp:null,q:()=>"1〜2ロール",s:"ティッシュ代わりにもなる万能品"},
+ {id:"h3",cat:"衛生・トイレ",name:"ウェットティッシュ(ノンアルコール)",grp:null,q:()=>"2個",s:"お風呂に入れない時の体拭きにも"},
+ {id:"h4",cat:"衛生・トイレ",name:"マスク",grp:null,q:f=>`${ppl(f)*3}枚`,s:"避難所のほこり・感染症対策"},
+ {id:"h5",cat:"衛生・トイレ",name:"歯みがきシート・マウスウォッシュ",grp:null,q:f=>`${ppl(f)}人分`,s:"水がなくても口の中を清潔に"},
+ {id:"h6",cat:"衛生・トイレ",name:"大きめのゴミ袋(45L)",grp:null,q:()=>"10枚",s:"ゴミ入れ・防寒・水運び・簡易カッパにもなる"},
+ {id:"h7",cat:"衛生・トイレ",name:"食品用ラップ",grp:null,q:()=>"1本",s:"皿に敷けば洗い物ゼロ。包帯の固定にも"},
+ {id:"h8",cat:"衛生・トイレ",name:"アルコール消毒(手指用)",grp:null,q:()=>"1本",s:""},
+ /* 救急・くすり */
+ {id:"m1",cat:"救急・くすり",name:"救急セット(絆創膏・消毒・包帯・ガーゼ)",grp:null,q:()=>"1セット",s:""},
+ {id:"m2",cat:"救急・くすり",name:"常備薬・持病の薬",grp:null,q:()=>"3日分以上",s:"処方薬は少し多めにもらって回す(医師に相談)"},
+ {id:"m3",cat:"救急・くすり",name:"お薬手帳のコピー",grp:null,q:()=>"服薬している人の分",s:"避難先で処方してもらう時に効く"},
+ {id:"m4",cat:"救急・くすり",name:"体温計",grp:null,q:()=>"1本",s:""},
+ /* 貴重品・書類 */
+ {id:"v1",cat:"貴重品・書類",name:"現金(小銭を多めに)",grp:null,q:()=>"数千円〜+10円玉",s:"停電時はカードも電子マネーも使えない。公衆電話用に10円玉"},
+ {id:"v2",cat:"貴重品・書類",name:"身分証・保険証のコピー",grp:null,q:f=>`${ppl(f)+f.baby}人分`,s:"原本は普段の持ち歩き。コピーで十分"},
+ {id:"v3",cat:"貴重品・書類",name:"家族の連絡先・集合場所メモ",grp:null,q:()=>"1枚",s:"スマホの電池が切れても連絡先がわかるように紙で"},
+ {id:"v4",cat:"貴重品・書類",name:"通帳・印鑑(または口座番号の控え)",grp:null,q:()=>"1式",s:"番号の控え+身分証で再発行できることが多い"},
+ {id:"v5",cat:"貴重品・書類",name:"家・車のスペアキー",grp:null,q:()=>"1式",s:""},
+ /* 衣類・防寒 */
+ {id:"c1",cat:"衣類・防寒",name:"軍手",grp:null,q:f=>`${ppl(f)}組`,s:"ガラス片からの手の保護に。滑り止め付きが◎"},
+ {id:"c2",cat:"衣類・防寒",name:"レインコート(上下セパレート型)",grp:null,q:f=>`${ppl(f)}着`,s:"傘は両手がふさがるのでNG。防寒着にもなる"},
+ {id:"c3",cat:"衣類・防寒",name:"着替え(下着・靴下)",grp:null,q:f=>`${ppl(f)+f.baby}人分×1〜2組`,s:"圧縮袋に入れるとかさが半分に"},
+ {id:"c4",cat:"衣類・防寒",name:"タオル",grp:null,q:f=>`${ppl(f)+2}枚`,s:"体を拭く・防寒・枕・止血と万能"},
+ {id:"c5",cat:"衣類・防寒",name:"アルミブランケット",grp:null,q:f=>`${ppl(f)+f.baby}枚`,s:"軽くて小さいのに毛布代わりになる"},
+ /* 道具 */
+ {id:"t1",cat:"道具",name:"ホイッスル(笛)",grp:null,q:f=>`${ppl(f)}個`,s:"閉じ込められた時に体力を使わず居場所を知らせる"},
+ {id:"t2",cat:"道具",name:"万能ナイフ・はさみ",grp:null,q:()=>"1本",s:""},
+ {id:"t3",cat:"道具",name:"布ガムテープ・油性ペン",grp:null,q:()=>"各1",s:"補修・伝言メモ・ガラス飛散防止と万能"},
+ {id:"t4",cat:"道具",name:"携帯スリッパ",grp:null,q:f=>`${ppl(f)}足`,s:"避難所の床は冷たい・汚れやすい"},
+ {id:"t5",cat:"道具",name:"給水袋(またはポリタンク)",grp:null,q:()=>"1個",s:"給水車が来た時に必須。折りたたみ式が軽い"},
+ {id:"t6",cat:"道具",name:"レジャーシート・ビニールシート",grp:null,q:()=>"1枚",s:"避難所での場所とり・敷物・目隠しに"},
+ /* 乳幼児 */
+ {id:"b1",cat:"乳幼児",name:"液体ミルク(または粉ミルク+水)",grp:"baby",q:()=>"3日分",s:"液体ミルクはお湯不要でそのまま飲める"},
+ {id:"b2",cat:"乳幼児",name:"使い捨て哺乳瓶・カップ",grp:"baby",q:()=>"数本",s:"洗えない状況を想定"},
+ {id:"b3",cat:"乳幼児",name:"離乳食・ベビーフード",grp:"baby",q:()=>"3日分",s:"スプーン付きパウチが便利"},
+ {id:"b4",cat:"乳幼児",name:"おむつ",grp:"baby",q:f=>`約${f.baby*15}枚(1日5枚×3日)`,s:"サイズアウトに注意。点検のたびに確認"},
+ {id:"b5",cat:"乳幼児",name:"おしりふき",grp:"baby",q:()=>"2個",s:"大人の体拭きにも使える"},
+ {id:"b6",cat:"乳幼児",name:"抱っこひも",grp:"baby",q:f=>`${f.baby}本`,s:"がれきの上はベビーカーが使えない"},
+ {id:"b7",cat:"乳幼児",name:"母子手帳のコピー",grp:"baby",q:f=>`${f.baby}冊分`,s:"予防接種歴がわかると避難先の診療がスムーズ"},
+ /* 子ども */
+ {id:"k1",cat:"子ども",name:"子ども用マスク",grp:"kid",q:f=>`${f.kid*3}枚`,s:"大人用はサイズが合わない"},
+ {id:"k2",cat:"子ども",name:"好きなお菓子",grp:"kid",q:()=>"適量",s:"不安な時に心を落ち着かせる効果は大きい"},
+ {id:"k3",cat:"子ども",name:"小さいおもちゃ・トランプ",grp:"kid",q:()=>"1つ",s:"避難生活の退屈と不安のケアに"},
+ {id:"k4",cat:"子ども",name:"名前・連絡先カード",grp:"kid",q:f=>`${f.kid}枚`,s:"はぐれた時のために身につけさせる"},
+ /* 高齢者 */
+ {id:"s1",cat:"高齢者",name:"老眼鏡・補聴器の予備電池",grp:"senior",q:()=>"使っている人の分",s:""},
+ {id:"s2",cat:"高齢者",name:"入れ歯・洗浄剤",grp:"senior",q:()=>"使っている人の分",s:""},
+ {id:"s3",cat:"高齢者",name:"杖などの歩行補助具",grp:"senior",q:()=>"使っている人の分",s:"避難路は段差やがれきが多い"},
+ {id:"s4",cat:"高齢者",name:"大人用紙パンツ(必要な場合)",grp:"senior",q:()=>"3日分",s:"トイレが遠い避難所でも安心"},
+ /* 女性 */
+ {id:"f1",cat:"女性",name:"生理用品",grp:"woman",q:()=>"1周期分",s:"避難所で手に入りにくい物の代表。多めに"},
+ {id:"f2",cat:"女性",name:"防犯ブザー",grp:"woman",q:()=>"1個",s:"ホイッスルと兼用でも"},
+ {id:"f3",cat:"女性",name:"中身の見えないポーチ・袋",grp:"woman",q:()=>"数枚",s:"下着や生理用品の持ち運びに"},
+ /* ペット */
+ {id:"p1",cat:"ペット",name:"ペットフード・飲み水",grp:"pet",q:f=>`${f.pet}匹×5日分`,s:"避難所の支援物資は人間優先。多めに備える"},
+ {id:"p2",cat:"ペット",name:"リード・キャリーバッグ",grp:"pet",q:f=>`${f.pet}匹分`,s:"同行避難の必需品"},
+ {id:"p3",cat:"ペット",name:"ペットシーツ・排泄用品",grp:"pet",q:()=>"3日分",s:""},
+ {id:"p4",cat:"ペット",name:"鑑札・迷子札・ペットの写真",grp:"pet",q:f=>`${f.pet}匹分`,s:"はぐれた時に探す手がかりになる"},
+ {id:"p5",cat:"ペット",name:"ペットの常備薬・療法食",grp:"pet",q:()=>"あれば3日分",s:""}
+];
+const CATS=[...new Set(ITEMS.map(i=>i.cat))];
+
+/* ============ 知識記事(普遍的な内容のみ・リライト不要設計) ============ */
+const ARTICLES=[
+ {t:"「持ち出しリュック」と「備蓄」は別物",b:`<p>防災の備えは2段構えで考えます。</p>
+ <ul><li><b>持ち出しリュック(一次持ち出し品)</b> — 避難する瞬間に背負って出る物。<b>最初の1日をしのぐ最小限</b>が目安。このアプリのリストはこちら</li>
+ <li><b>備蓄(二次持ち出し品)</b> — 自宅で避難生活を送るための物。水は1人1日3L×最低3日(できれば1週間)、食料も同様に家に置いておく</li></ul>
+ <p>全部リュックに入れようとすると重くて背負えなくなります。<b>リュックの重さの目安は、男性で15kg・女性で10kg以下</b>。背負って走れるかが基準です。</p>`},
+ {t:"リュックの置き場所は「逃げる動線の上」",b:`<ul>
+ <li>ベストは<b>玄関</b>か<b>寝室</b>。地震は寝ている時に来ることも多い</li>
+ <li>押し入れの奥・物置はNG。取り出せなければ無いのと同じ</li>
+ <li>家族それぞれが自分のリュックを持つ場合は、各自の寝室に</li>
+ <li>車がある家は、車にも水・毛布・簡易トイレを少し積んでおくと二重の備えになる</li></ul>`},
+ {t:"年2回の点検日を決めよう",b:`<p>備えは「作って終わり」ではなく「たまに見直す」が大事。おすすめは<b>3月と9月(防災週間)の年2回</b>、日付を決めて点検することです。</p>
+ <h4>点検チェック</h4>
+ <ul><li>食品・水の賞味期限(切れそうなら普段の食事で消費して買い足す=ローリングストック)</li>
+ <li>電池の液漏れ・モバイルバッテリーの充電</li>
+ <li>子どもの服・おむつ・靴のサイズアウト</li>
+ <li>薬・連絡先メモの内容が最新か</li></ul>
+ <p>このアプリのチェックを一度リセットして、実物を見ながら付け直すのが確実です。</p>`},
+ {t:"家族で決めておく3つのこと",b:`<p>物の備えと同じくらい大事なのが「約束の備え」です。</p>
+ <ol><li><b>集合場所</b> — 家に戻れない時にどこで会うか(小学校・公園など2段階で)</li>
+ <li><b>連絡手段</b> — 災害用伝言ダイヤル「171」の使い方を家族全員で一度練習しておく。遠方の親戚を中継役に決めるのも有効</li>
+ <li><b>役割</b> — 誰がリュックを持つか、誰が子ども・ペットを担当するか</li></ol>
+ <p>決めた内容は紙に書いて、このリストの「家族の連絡先・集合場所メモ」としてリュックに入れましょう。</p>`},
+ {t:"よくある「入れすぎ」と「見落とし」",b:`<h4>入れがちだけど見直したい物</h4>
+ <ul><li>缶切りが要る缶詰(そのまま食べられる物に)</li><li>大量の水(持ち出しは1人1.5L程度に。残りは家に備蓄)</li><li>ろうそく(火災リスク。ライトで代用)</li></ul>
+ <h4>見落としがちな物</h4>
+ <ul><li>簡易トイレ(断水で最初に困るのがトイレ)</li><li>小銭と10円玉(停電時はレジも公衆電話も現金)</li><li>スリッパ(避難所の床は冷たい)</li><li>メガネの予備・コンタクト用品</li></ul>`}
+];
+
+/* ============ 状態 ============ */
+const KEY="bousai-v1";
+const $=s=>document.querySelector(s);
+function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function load(){
+  try{ const raw=localStorage.getItem(KEY); if(raw){ const s=JSON.parse(raw); if(s&&s.fam) return s; } }catch(e){}
+  return { fam:{adult:2,kid:0,baby:0,senior:0,pet:0,woman:true}, have:{} };
+}
+let S=load();
+let saveFailWarned=false;
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(S)); }
+  catch(e){ if(!saveFailWarned){ saveFailWarned=true; alert("端末内の保存容量がいっぱいで、変更を保存できませんでした。"); } }
+}
+function copyText(t,btn,doneLabel){
+  const ok=()=>{ if(btn) btn.textContent=doneLabel; };
+  const fb=()=>{ const ta=document.createElement("textarea"); ta.value=t; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); ok(); }catch(e){ alert("コピーできませんでした"); } ta.remove(); };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(ok).catch(fb); } else fb();
+}
+
+/* ============ リスト生成 ============ */
+function visibleItems(){
+  const f=S.fam;
+  return ITEMS.filter(it=>{
+    if(!it.grp) return true;
+    if(it.grp==="baby") return f.baby>0;
+    if(it.grp==="kid") return f.kid>0;
+    if(it.grp==="senior") return f.senior>0;
+    if(it.grp==="woman") return !!f.woman;
+    if(it.grp==="pet") return f.pet>0;
+    return true;
+  });
+}
+function progress(){
+  const vis=visibleItems();
+  const done=vis.filter(it=>S.have[it.id]).length;
+  return {done, total:vis.length, pct: vis.length?Math.round(done/vis.length*100):0};
+}
+
+/* ============ リュックタブ ============ */
+const FAMF=[
+ ["adult","大人","18〜64歳"],
+ ["kid","子ども","小学生〜高校生くらい"],
+ ["baby","乳幼児","0歳〜未就学"],
+ ["senior","高齢の家族","65歳以上の目安"],
+ ["pet","ペット","犬・猫など"]
+];
+function renderPack(){
+  const el=$("#tab-pack");
+  const p=progress();
+  let html=`<div class="card">
+    <div class="row"><b class="grow">わが家の備え</b><span class="big">${p.pct}%</span></div>
+    <div class="pbar" style="margin-top:6px"><div style="width:${p.pct}%"></div></div>
+    <p class="small pnum" style="margin-top:4px">${p.done} / ${p.total} 準備できています${p.pct===100?" 🎉 すばらしい!":""}</p>
+  </div>`;
+  html+=`<div class="card"><div class="grouphead" style="margin:0 0 4px">家族構成(リストが自動で変わります)</div>`;
+  FAMF.forEach(([k,label,hint])=>{
+    html+=`<div class="fam"><span class="lb">${label}<span class="hint">${hint}</span></span>
+      <button data-dec="${k}" aria-label="${label}を減らす">−</button>
+      <span class="num">${S.fam[k]}</span>
+      <button data-inc="${k}" aria-label="${label}を増やす">＋</button>
+    </div>`;
+  });
+  html+=`<div class="fam"><span class="lb">女性がいる<span class="hint">生理用品・防犯グッズをリストに追加</span></span>
+    <span class="seg"><button id="womanBtn" class="${S.fam.woman?"on":""}" style="white-space:nowrap; min-width:64px">${S.fam.woman?"はい":"いいえ"}</button></span>
+  </div></div>`;
+  const vis=visibleItems();
+  CATS.forEach(cat=>{
+    const items=vis.filter(it=>it.cat===cat);
+    if(!items.length) return;
+    const dn=items.filter(it=>S.have[it.id]).length;
+    html+=`<h2>${esc(cat)} <span class="small pnum">${dn}/${items.length}</span></h2><div class="card">`;
+    items.forEach(it=>{
+      html+=`<div class="item ${S.have[it.id]?"done":""}">
+        <input type="checkbox" data-have="${it.id}" ${S.have[it.id]?"checked":""}>
+        <div class="nm">
+          <div class="t">${esc(it.name)} <span class="q">${esc(it.q(S.fam))}</span></div>
+          ${it.s?`<div class="s">${esc(it.s)}</div>`:""}
+        </div>
+      </div>`;
+    });
+    html+=`</div>`;
+  });
+  html+=`<p class="small">数量は3日間しのぐための一般的な目安です。ご家庭の事情に合わせて調整してください。</p>`;
+  el.innerHTML=html;
+  el.querySelectorAll("[data-inc]").forEach(b=>b.onclick=()=>{ const k=b.dataset.inc; S.fam[k]=Math.min(9,(S.fam[k]||0)+1); save(); renderPack(); updateHead(); });
+  el.querySelectorAll("[data-dec]").forEach(b=>b.onclick=()=>{ const k=b.dataset.dec; S.fam[k]=Math.max(0,(S.fam[k]||0)-1); save(); renderPack(); updateHead(); });
+  $("#womanBtn").onclick=()=>{ S.fam.woman=!S.fam.woman; save(); renderPack(); updateHead(); };
+  el.querySelectorAll("[data-have]").forEach(c=>c.onchange=()=>{
+    if(c.checked) S.have[c.dataset.have]=true; else delete S.have[c.dataset.have];
+    save(); renderPack(); updateHead();
+  });
+}
+
+/* ============ 足りない物タブ ============ */
+function renderShop(){
+  const el=$("#tab-shop");
+  const vis=visibleItems();
+  const missing=vis.filter(it=>!S.have[it.id]);
+  let html="";
+  if(!missing.length){
+    html+=`<div class="card"><p><b>🎉 ぜんぶ準備できています!</b></p>
+    <p class="small" style="margin-top:6px">次は「知識」タブの点検日を決めて、年2回の見直しを習慣にしましょう。</p></div>`;
+  } else {
+    html+=`<div class="notice">あと <b>${missing.length}個</b> で完成。ほとんどは100均・ドラッグストア・ホームセンターで揃います。</div>`;
+    CATS.forEach(cat=>{
+      const items=missing.filter(it=>it.cat===cat);
+      if(!items.length) return;
+      html+=`<h2>${esc(cat)}</h2><div class="card">`;
+      items.forEach(it=>{
+        html+=`<div class="item">
+          <input type="checkbox" data-have2="${it.id}">
+          <div class="nm"><div class="t">${esc(it.name)} <span class="q">${esc(it.q(S.fam))}</span></div></div>
+        </div>`;
+      });
+      html+=`</div>`;
+    });
+    html+=`<button class="primary" id="shopCopy" style="width:100%; margin-top:4px">📋 買い物リストをコピー</button>
+    <p class="small" style="margin-top:6px">買ったらチェック→「リュック」タブの準備率に反映されます。</p>`;
+  }
+  el.innerHTML=html;
+  el.querySelectorAll("[data-have2]").forEach(c=>c.onchange=()=>{
+    if(c.checked) S.have[c.dataset.have2]=true; else delete S.have[c.dataset.have2];
+    save(); renderShop(); updateHead();
+  });
+  const btn=$("#shopCopy");
+  if(btn) btn.onclick=()=>{
+    let t="【防災リュックの買い物リスト】\n";
+    CATS.forEach(cat=>{
+      const items=missing.filter(it=>it.cat===cat);
+      if(!items.length) return;
+      t+=`\n■${cat}\n`+items.map(it=>`・${it.name}(${it.q(S.fam)})`).join("\n")+"\n";
+    });
+    copyText(t,btn,"✅ コピーしました");
+  };
+}
+
+/* ============ 知識タブ ============ */
+function renderKnow(){
+  const el=$("#tab-know");
+  el.innerHTML=`<p class="small" style="margin-bottom:8px">「作って終わり」にしないための知識です。</p>`+
+    ARTICLES.map((a,i)=>`<div class="card article"><details ${i===0?"open":""}><summary>${esc(a.t)}</summary>${a.b}</details></div>`).join("");
+}
+
+/* ============ 設定タブ ============ */
+function renderSettings(){
+  const el=$("#tab-settings");
+  el.innerHTML=`
+  <div class="card">
+    <h2 style="margin-top:0">このアプリについて</h2>
+    <p class="small">家族構成に合わせて防災リュック(一次持ち出し品)の中身リストを作り、準備状況をチェックできるアプリです。数量は一般的な目安で、3日間をしのぐことを想定しています。</p>
+    <p class="small" style="margin-top:6px">チェック状況・家族構成は<b>この端末の中にだけ</b>保存されます。外部への送信はありません。アカウント登録も不要です。</p>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">データ</h2>
+    <div class="row">
+      <button id="btnExport" class="ghost">書き出す(コピー)</button>
+      <button id="btnImport" class="ghost">貼り付けて読み込む</button>
+      <button id="btnReset" class="ghost" style="color:var(--warn)">全データ初期化</button>
+    </div>
+    <textarea id="ioArea" placeholder="書き出し結果 / 読み込み時はここに貼り付け" style="margin-top:8px"></textarea>
+    <p class="small">年2回の点検で「チェックだけリセット」したい場合も、ここから初期化して付け直すのがおすすめです(家族構成は入れ直してください)。</p>
+  </div>`;
+  $("#btnExport").onclick=()=>{
+    const t=JSON.stringify(S);
+    $("#ioArea").value=t; copyText(t,$("#btnExport"),"✅ コピーしました");
+  };
+  $("#btnImport").onclick=()=>{
+    try{
+      const o=JSON.parse($("#ioArea").value); if(!o||!o.fam) throw 0;
+      S=o; save(); render(); alert("読み込みました");
+    }catch(e){ alert("読み込めませんでした。書き出した文字列をそのまま貼ってください。"); }
+  };
+  $("#btnReset").onclick=()=>{
+    if(confirm("この端末のデータをすべて消します。よろしいですか?")){
+      localStorage.removeItem(KEY); location.reload();
+    }
+  };
+}
+
+/* ============ タブ・起動 ============ */
+let tab="pack";
+document.querySelectorAll("nav.tabs button").forEach(b=>{
+  b.addEventListener("click",()=>{ tab=b.dataset.tab; render(); });
+});
+function updateHead(){
+  const p=progress();
+  $("#hSub").textContent=`準備 ${p.pct}%`;
+}
+function render(){
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===tab));
+  ["pack","shop","know","settings"].forEach(t=>{ $("#tab-"+t).hidden=(t!==tab); });
+  if(tab==="pack") renderPack();
+  if(tab==="shop") renderShop();
+  if(tab==="know") renderKnow();
+  if(tab==="settings") renderSettings();
+  updateHead();
+}
+render();
+</script>
+<script>
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js");
+</script>
+</body>
+</html>
